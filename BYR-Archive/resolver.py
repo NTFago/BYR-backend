@@ -1,8 +1,10 @@
 """
-@Description :   版本解析
+@Description :   解析入口文件、URL 到实际文件路径
 @Author      :   XiaoYuan
 @Time        :   2025/09/22 15:01:04
 """
+import os
+import json
 from semantic_version import Version, Spec
 
 def resolve_version(version_spec: str, metadata: dict) -> str | None:
@@ -11,7 +13,7 @@ def resolve_version(version_spec: str, metadata: dict) -> str | None:
     """
     dist_tags = metadata.get("dist-tags", {})
     versions = sorted(
-        [Version(v, partial=True) for v in metadata.get("versions", {}).keys()]
+        [Version(v) for v in metadata.get("versions", {}).keys()]
     )
 
     # 1. 没指定 → latest
@@ -35,4 +37,31 @@ def resolve_version(version_spec: str, metadata: dict) -> str | None:
     except Exception:
         pass
 
+    # 没找到符合的版本
     return None
+
+def resolve_entry_file(root_dir: str) -> str:
+    """
+    处理 package.json，找出入口文件
+    """
+    pkg_json = os.path.join(root_dir, "package.json")
+    if not os.path.exists(pkg_json):
+        return "index.js"
+
+    with open(pkg_json, "r", encoding="utf-8") as f:
+        pkg = json.load(f)
+
+    # 处理experts["."]
+    if "exports" in pkg and "." in pkg["exports"]:
+        exp = pkg["exports"]["."]
+        if isinstance(exp, dict) and "default" in exp:
+            return exp["default"].lstrip("./")
+        if isinstance(exp, str):
+            return exp.lstrip("./")
+
+    # 无exports，处理main字段
+    if "main" in pkg:
+        return pkg["main"].lstrip("./")
+
+    # fallback到index.js
+    return "index.js"
