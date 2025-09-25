@@ -40,13 +40,13 @@ def resolve_version(version_spec: str, metadata: dict) -> str | None:
     # 没找到符合的版本
     return None
 
-def resolve_entry_file(root_dir: str) -> str:
+def resolve_entry_file(root_dir: str) -> tuple[bool, str]:
     """
     处理 package.json，找出入口文件
     """
     pkg_json = os.path.join(root_dir, "package.json")
     if not os.path.exists(pkg_json):
-        return "index.js"
+        return (True, "index.js")
 
     with open(pkg_json, "r", encoding="utf-8") as f:
         pkg = json.load(f)
@@ -55,13 +55,14 @@ def resolve_entry_file(root_dir: str) -> str:
     if "exports" in pkg and "." in pkg["exports"]:
         exp = pkg["exports"]["."]
         if isinstance(exp, dict) and "default" in exp:
-            return exp["default"].lstrip("./")
+            return (True, exp["default"].lstrip("./"))
         if isinstance(exp, str):
-            return exp.lstrip("./")
+            return (True, exp.lstrip("./"))
+        return (False, "No expected entry matched.")
 
     # 无exports，处理main字段
     if "main" in pkg:
-        return pkg["main"].lstrip("./")
+        return (True, pkg["main"].lstrip("./"))
 
     # fallback到index.js
-    return "index.js"
+    return (False, "No expected entry matched.")

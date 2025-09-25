@@ -1,5 +1,5 @@
 """
-@Description :   jsDelivr 服务
+@Description :   jsDelivr 服务模拟
 @Author      :   XiaoYuan
 @Time        :   2025/09/22 15:56:04
 """
@@ -37,6 +37,7 @@ async def serve(path: str):
     """
     路由规则:
       /pkg
+      /pkg/
       /pkg@version
       /pkg@version/file.js
       /pkg@version/
@@ -117,7 +118,9 @@ async def serve(path: str):
 
     # 处理入口文件
     if not sub_path:
-        entry = resolve_entry_file(root_dir)
+        res, entry = resolve_entry_file(root_dir)
+        if not res:
+            raise HTTPException(404, entry)
         file_path = f"{root_dir}/{entry}"
     else:
         file_path = f"{root_dir}/{sub_path}"
