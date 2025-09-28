@@ -64,5 +64,4 @@ def resolve_entry_file(root_dir: str) -> tuple[bool, str]:
     if "main" in pkg:
         return (True, pkg["main"].lstrip("./"))
 
-    # fallback到index.js
     return (False, "No expected entry matched.")

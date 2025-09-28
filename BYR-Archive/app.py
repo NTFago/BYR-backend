@@ -74,6 +74,10 @@ async def serve(path: str):
     ## 无版本号无具体文件
     else:
         package_name, version_spec, sub_path = path, "latest", ""
+    
+    package_name = package_name.strip("/")
+    version_spec = version_spec.strip().strip("/")
+    sub_path = sub_path.strip().strip("/")
 
     logger.debug(
         f"{package_name=}, {version_spec=}, {sub_path=}"
