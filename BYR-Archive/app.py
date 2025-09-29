@@ -12,7 +12,7 @@ from registry import get_package_metadata
 from resolver import resolve_version, resolve_entry_file
 from utils import get_content_type
 from cache import ensure_package_cached, metadata_cache, dir_cache
-from logger import logger
+from local_logger import logger
 
 
 app = FastAPI()
@@ -27,9 +27,11 @@ async def log_requests(request, call_next):
     process_time = (time.time() - start_time) * 1000
 
     logger.info(
-        f"{request.client.host} {request.method} {request.url.path} "
-        f"status={response.status_code} time={process_time:.2f}ms"
+        "%s %s %s status=%d time=%.2fms",
+        request.client.host, request.method, request.url.path,
+        response.status_code, process_time
     )
+
     return response
 
 @app.get("/{path:path}")
@@ -43,11 +45,7 @@ async def serve(path: str):
       /pkg@version/
     """
     if not path:
-        return HTMLResponse("{}")
-
-    logger.info(
-        f"Request path: {path}"
-    )
+        return HTMLResponse(str({}), status_code=200)
 
 
     # 解析包名、版本、文件路径
@@ -74,28 +72,32 @@ async def serve(path: str):
     ## 无版本号无具体文件
     else:
         package_name, version_spec, sub_path = path, "latest", ""
-    
+
     package_name = package_name.strip("/")
     version_spec = version_spec.strip().strip("/")
     sub_path = sub_path.strip().strip("/")
 
-    logger.debug(
-        f"{package_name=}, {version_spec=}, {sub_path=}"
+    logger.info(
+        "Parsed: package_name=%s, version_spec=%s, sub_path=%s",
+        package_name, version_spec, sub_path
     )
 
     metadata = get_package_metadata(package_name, metadata_cache)
     if not metadata[0]:
+        logger.error("Failed to fetch metadata for package '%s': %s", package_name, metadata[1])
         raise HTTPException(502, f"Error fetching metadata: {metadata[1]}")
     metadata = metadata[1]
 
     version = resolve_version(version_spec, metadata)
     if version is None:
+        logger.error("Version '%s' not found for package '%s'", version_spec, package_name)
         raise HTTPException(404, f"Version '{version_spec}' not found for package '{package_name}'")
 
     root_dir = ensure_package_cached(package_name, version, metadata)
     if root_dir is None:
+        logger.error("Failed to download tarball for package '%s' version '%s'", package_name, version)
         raise HTTPException(502, "Error downloading package tarball")
-    
+
     logger.debug(
         f"{version=}, {root_dir=}"
     )
@@ -110,6 +112,7 @@ async def serve(path: str):
                 files = os.listdir(file_path)
                 dir_cache[file_path] = files
             except FileNotFoundError as exc:
+                logger.error("Directory not found: %s", file_path)
                 raise HTTPException(404, "Directory not found") from exc
         links = "".join(
             f'<li><a href="{name}">{name}</a></li>' for name in files
@@ -124,17 +127,17 @@ async def serve(path: str):
     if not sub_path:
         res, entry = resolve_entry_file(root_dir)
         if not res:
+            logger.error("Entry file not found in package '%s' version '%s'", package_name, version)
             raise HTTPException(404, entry)
         file_path = f"{root_dir}/{entry}"
     else:
         file_path = f"{root_dir}/{sub_path}"
-    
-    logger.debug(
-        f"{file_path=}"
-    )
+
+    logger.debug("Resolved file path: %s", file_path)
 
 
     # 文件
     if not os.path.exists(file_path) :
+        logger.error("File not found: %s", file_path)
         raise HTTPException(404, f"File not found: {sub_path}")
     return FileResponse(file_path, media_type=get_content_type(file_path))
