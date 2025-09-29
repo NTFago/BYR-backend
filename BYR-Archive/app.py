@@ -84,23 +84,25 @@ async def serve(path: str):
 
     metadata = get_package_metadata(package_name, metadata_cache)
     if not metadata[0]:
-        logger.error("Failed to fetch metadata for package '%s': %s", package_name, metadata[1])
+        logger.error("Failed to fetch metadata for package '%s': %s",
+                     package_name, metadata[1])
         raise HTTPException(502, f"Error fetching metadata: {metadata[1]}")
     metadata = metadata[1]
 
     version = resolve_version(version_spec, metadata)
     if version is None:
-        logger.error("Version '%s' not found for package '%s'", version_spec, package_name)
+        logger.error("Version '%s' not found for package '%s'",
+                     version_spec, package_name)
         raise HTTPException(404, f"Version '{version_spec}' not found for package '{package_name}'")
 
     root_dir = ensure_package_cached(package_name, version, metadata)
     if root_dir is None:
-        logger.error("Failed to download tarball for package '%s' version '%s'", package_name, version)
+        logger.error("Failed to download tarball for package '%s' version '%s'",
+                     package_name, version)
         raise HTTPException(502, "Error downloading package tarball")
 
-    logger.debug(
-        f"{version=}, {root_dir=}"
-    )
+    logger.info("Serving package '%s' version '%s' from '%s'",
+                package_name, version, root_dir)
 
     # 目录
     if path.endswith("/"):
